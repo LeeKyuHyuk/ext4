@@ -101,6 +101,18 @@ Existing filesystems can have checksumming added by running tune2fs -O metadata_
 
 The following table describes the data elements that go into each type of checksum. The checksum function is whatever the superblock describes (crc32c as of October 2013) unless noted otherwise.
 
+| Metadata | Length | Ingredients |
+|---|---|---|
+| Superblock | __le32 | The entire superblock up to the checksum field. The UUID lives inside the superblock. |
+| MMP | __le32 | UUID + the entire MMP block up to the checksum field. |
+| Extended Attributes | __le32 | UUID + the entire extended attribute block. The checksum field is set to zero. |
+| Directory Entries | __le32 | UUID + inode number + inode generation + the directory block up to the fake entry enclosing the checksum field. |
+| HTREE Nodes | __le32 | UUID + inode number + inode generation + all valid extents + HTREE tail. The checksum field is set to zero. |
+| Extents | __le32 | UUID + inode number + inode generation + the entire extent block up to the checksum field. |
+| Bitmaps | __le32 or __le16 | UUID + the entire bitmap. Checksums are stored in the group descriptor, and truncated if the group descriptor size is 32 bytes (i.e. ^64bit) |
+| Inodes | __le32 | UUID + inode number + inode generation + the entire inode. The checksum field is set to zero. Each inode has its own checksum. |
+| Group Descriptors | __le16 | If metadata_csum, then UUID + group number + the entire descriptor; else if gdt_csum, then crc16(UUID + group number + the entire descriptor). In all cases, only the lower 16 bits are stored. |
+
 ## 2.9. Bigalloc
 At the moment, the default size of a block is 4KiB, which is a commonly supported page size on most MMU-capable hardware. This is fortunate, as ext4 code is not prepared to handle the case where the block size exceeds the page size. However, for a filesystem of mostly huge files, it is desirable to be able to allocate disk blocks in units of multiple blocks to reduce both fragmentation and metadata overhead. The bigalloc feature provides exactly this ability. The administrator can set a block cluster size at mkfs time (which is stored in the s_log_cluster_size field in the superblock); from then on, the block bitmaps track clusters, not individual blocks. This means that block groups can be several gigabytes in size (instead of just 128MiB); however, the minimum allocation unit becomes a cluster, not a block, even for directories. TaoBao had a patchset to extend the “use units of clusters instead of blocks” to the extent tree, though it is not clear where those patches went– they eventually morphed into “extent tree v2” but that code has not landed as of May 2015.
 
